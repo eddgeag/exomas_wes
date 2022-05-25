@@ -13,4 +13,4 @@ bwa mem \
 -v 3 \
 -R $(echo "@RG\tID:$id\tSM:$id"_"$sm\tLB:$id"_"$sm\tPL:ILLUMINA") \
 $3 \
-$1 $2 
+$1 $2 -o $4 
