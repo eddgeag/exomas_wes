@@ -1,2 +1,3 @@
-# exomas_wes
-Flujo Bioinformatico Exomas
+# Biomolecular
+
+Trabajando con exomas
