@@ -23,7 +23,7 @@ library(tools)
 pipeline <- "../pipeline"
 muestra <- "muestraToy"
 folder_fq <- "fastq_files"
-folder_fasta <- "../datos/cromosoma8"
+folder_fasta <- "../datos/genomaHg19/cromosoma8"
 dir_snpeff <- "~/tools/exomas_tools/snpEff/"
 files_folder <- file.path(pipeline, muestra, folder_fq)
 output_directory <- file.path(pipeline, muestra, "output_dir")
