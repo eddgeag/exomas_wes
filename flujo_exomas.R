@@ -25,7 +25,7 @@ library(tools)
 
 
 fastqc_R <-
-  function(input_directory = files_folder) {
+  function(input_directory = files_folder,name_output_dir) {
     exit_status1 <- 1
     exit_status0 <- 0
     
@@ -37,7 +37,7 @@ fastqc_R <-
       file.path(paste(unlist(strsplit(
         file.path(input_directory), "/"
       ))[1:3], collapse = "/")
-      , "output_dir")
+      , name_output_dir)
     output_dir_fqc <- file.path(output_dir, "output_QC")
     command <-
       paste("fastqc -t 4 ",
