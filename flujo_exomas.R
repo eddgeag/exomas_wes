@@ -134,7 +134,7 @@ index_fasta_bwa <- function(input_directory = folder_fasta) {
 
 bwa_mem2 <-
   function(fastq_folder = files_folder ,
-           reference_genome = folder_fasta) {
+           reference_genome = folder_fasta,referencia) {
     ## Comprobamos que existe archivo fasta
     
     extension = "fasta$"
@@ -201,7 +201,7 @@ bwa_mem2 <-
         file.path(fastq_folder), "/"
       ))[1:3], collapse = "/")
       , "output_dir")
-    output_folder <- file.path(output_dir, "mapping_output")
+    output_folder <- file.path(paste(output_dir, referencia,sep="_"),"mapping_output")
     output_file_sam <-
       file.path(output_folder, paste0(output_file_name, ".sam"))
     output_file_bam <-
@@ -1037,9 +1037,9 @@ dir_snpeff_ <- "~/tools/exomas_tools/snpEff/"
 files_folder <- file.path(pipeline, muestra, folder_fq)
 output_directory <- file.path(pipeline, muestra, paste0("output_dir_",referencia))
 
-fastqc_R()
+fastqc_R(name_output_dir=paste0("output_dir_",referencia))
 #
-bwa_mem2()
+bwa_mem2(referencia=referencia)
 #
 filter1()
 #
