@@ -3,6 +3,7 @@
 
 
 
+
 ## Flujo bioinfomartico para exomas enfermedades geneticas (1)
 ## Basado en subprocesos en R
 
@@ -25,19 +26,23 @@ library(tools)
 
 
 fastqc_R <-
-  function(input_directory = files_folder,name_output_dir) {
+  function(input_directory = files_folder, name_output_dir) {
+
+    
+   
     exit_status1 <- 1
     exit_status0 <- 0
     
     files_fastq <- list.files(input_directory, full.names = T)
     
     pattern_files <- unique(file_ext(files_fastq))
-    
-    output_dir <-
+    input_directory <- files_folder
+
+    (output_dir <-
       file.path(paste(unlist(strsplit(
         file.path(input_directory), "/"
-      ))[1:3], collapse = "/")
-      , name_output_dir)
+      ))[1:5], collapse = "/")
+      , name_output_dir))
     output_dir_fqc <- file.path(output_dir, "output_QC")
     command <-
       paste("fastqc -t 4 ",
@@ -134,7 +139,8 @@ index_fasta_bwa <- function(input_directory = folder_fasta) {
 
 bwa_mem2 <-
   function(fastq_folder = files_folder ,
-           reference_genome = folder_fasta,referencia) {
+           reference_genome = folder_fasta,
+           referencia) {
     ## Comprobamos que existe archivo fasta
     
     extension = "fasta$"
@@ -199,9 +205,10 @@ bwa_mem2 <-
     output_dir <-
       file.path(paste(unlist(strsplit(
         file.path(fastq_folder), "/"
-      ))[1:3], collapse = "/")
+      ))[1:5], collapse = "/")
       , "output_dir")
-    output_folder <- file.path(paste(output_dir, referencia,sep="_"),"mapping_output")
+    output_folder <-
+      file.path(paste(output_dir, referencia, sep = "_"), "mapping_output")
     output_file_sam <-
       file.path(output_folder, paste0(output_file_name, ".sam"))
     output_file_bam <-
@@ -339,6 +346,7 @@ bwa_mem2 <-
 
 
 filter1 <- function(input_directory = output_directory) {
+  input_directory <- output_directory
   carpeta <- "mapping_output"
   output_folder <- file.path(input_directory, carpeta)
   input_bam <-
@@ -349,8 +357,8 @@ filter1 <- function(input_directory = output_directory) {
   out_file <-
     file.path(output_folder,
               paste(input_bam.name.sans_ext, "filtraje_1.bam", sep = "_"))
-  
-  if (!file.exists(out_file)) {
+  print(out_file)
+  if (!file.exists(out_file) && length(out_file)==1) {
     command <-
       paste(
         "bamtools filter -in",
@@ -504,6 +512,7 @@ RmDup <- function(input_directory = output_directory) {
     } else{
       message("Ya esta marcado y sorteado")
     }
+    
     
     
     
@@ -664,7 +673,6 @@ snpeff <-
       file_ext(x))),
       unlist(lapply(list.files(reference_genome, pattern = "fasta$"), function(x)
         file_ext(x))))
-    print(extension)
     if (extension == "fasta" | extension == "fa") {
       extension <- extension
     } else{
@@ -678,6 +686,7 @@ snpeff <-
     fasta_ref <- fasta_ref[grep("hg", ignore.case = T, fasta_ref)]
     fasta_ref <- unlist(strsplit(fasta_ref, "[A-Za-z]"))
     fasta_ref <- ifelse(fasta_ref == "", NA, fasta_ref)
+    fasta_ref <- gsub("[.]",NA,fasta_ref)
     referencia_version <-
       paste0("hg", fasta_ref[complete.cases(fasta_ref)])
     file_input <-
@@ -687,6 +696,8 @@ snpeff <-
       list.files(dir_snpeff, "snpEff.jar", full.names = T)
     snpsift_program <-
       list.files(dir_snpeff, "SnpSift.jar", full.names = T)
+
+    
     if (referencia_version == "hg19") {
       output_folder <-
         file.path(input_directory, paste0("anotacion", referencia_version))
@@ -699,16 +710,21 @@ snpeff <-
         file.path(output_folder, "annotated__hg19_clin.vcf")
       
       campos_data_hg19 <-
-        list.files(file.path(dir_snpeff, "data", "dbNSFP", "hg19"), pattern = "gz$",full.names = T)
+        list.files(
+          file.path("~/tools/exomas_tools/snpEff/data", "dbNSFP", "hg19"),
+          pattern = "gz$",
+          full.names = T
+        )
       clinvar_hg19 <-
-        list.files(file.path(dir_snpeff, "data", "clinvar", "GRCh37"), "gz$",full.names = T)
+        list.files(file.path("~/tools/exomas_tools/snpEff/data", "clinvar", "GRCh37"),
+                   "gz$",
+                   full.names = T)
       if (!dir.exists(output_folder)) {
         dir.create(output_folder)
         if (!file.exists(file_output1.hg19) |
             !file.exists(file_output2.hg19) |
             !file.exists(file_output3.hg19)) {
-          
-          if(!file.exists(file_output1.hg19)){
+          if (!file.exists(file_output1.hg19)) {
             comando1_hg19 <-
               paste(
                 "java -Xmx4g -jar ",
@@ -725,20 +741,20 @@ snpeff <-
             system(comando1_hg19)
             
             
-          }else{
+          } else{
             message("Ya se ha andotado 1 version hg19")
           }
-
-          if(!file.exists(file_output2.hg19)){
+          
+          if (!file.exists(file_output2.hg19)) {
             comando2_hg19 <-
               paste(
                 "java -Xmx4g -jar ",
                 snpsift_program,
                 "DbNsfp -db",
                 campos_data_hg19,
-                "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score -v",
+                "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score",
                 file_output1.hg19,
-                ">",
+                "-v >",
                 file_output2.hg19
                 
                 
@@ -748,28 +764,30 @@ snpeff <-
             system(comando2_hg19)
             
             
-          }else{
+          } else{
             message("Ya se ha anotado 2 version hg19")
           }
-          if(!file.exists(file_output3.hg19)){
+          if (!file.exists(file_output3.hg19)) {
             comando3_clinvar.hg19 <-
-              paste("java -Xmx4g -jar",
-                    snpsift_program,
-                    "annotate",
-                    file_output2.hg19,
-                    clinvar_hg19,
-                    "-v >",
-                    file_output3.hg19)
+              paste(
+                "java -Xmx4g -jar",
+                snpsift_program,
+                "annotate",
+                clinvar_hg19,
+                file_output2.hg19,
+                "-v >",
+                file_output3.hg19
+              )
             print(comando3_clinvar.hg19)
             
             system(comando3_clinvar.hg19)
             
             
             
-          }else{
+          } else{
             message("Ya se ha anotado 3 version hg19")
           }
-
+          
           
         } else{
           message("Ya se ha anotado el exoma")
@@ -779,9 +797,7 @@ snpeff <-
         if (!file.exists(file_output1.hg19) |
             !file.exists(file_output2.hg19) |
             !file.exists(file_output3.hg19)) {
-          
-          if(!file.exists(file_output1.hg19)){
-            
+          if (!file.exists(file_output1.hg19)) {
             comando1_hg19 <-
               paste(
                 "java -Xmx4g -jar ",
@@ -797,20 +813,19 @@ snpeff <-
             
             system(comando1_hg19)
             
-          }else{
+          } else{
             message("Ya se ha anotado y el directorio existe 1 version hg19")
           }
-          if(!file.exists(file_output2.hg19)){
-            
+          if (!file.exists(file_output2.hg19)) {
             comando2_hg19 <-
               paste(
                 "java -Xmx4g -jar ",
                 snpsift_program,
                 "DbNsfp -db",
                 campos_data_hg19,
-                "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score -v",
+                "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score ",
                 file_output1.hg19,
-                ">",
+                "-v >",
                 file_output2.hg19
                 
                 
@@ -819,32 +834,32 @@ snpeff <-
             print(comando2_hg19)
             system(comando2_hg19)
             
-          }else{
+          } else{
             message("Ya se ha anotado y el directorio existe 2 version hg19")
           }
-          if(!file.exists(file_output3.hg19)){
-            
-            
+          if (!file.exists(file_output3.hg19)) {
             comando3_clinvar.hg19 <-
-              paste("java -Xmx4g -jar",
-                    snpsift_program,
-                    "annotate",
-                    file_output2.hg19,
-                    clinvar_hg19,
-                    "-v >",
-                    file_output3.hg19)
+              paste(
+                "java -Xmx4g -jar",
+                snpsift_program,
+                "annotate",
+                clinvar_hg19,
+                file_output2.hg19,
+                "-v >",
+                file_output3.hg19
+              )
             print(comando3_clinvar.hg19)
             
             system(comando3_clinvar.hg19)
             
             
             
-          }else{
+          } else{
             message("Ya se ha anotado todo el exoma 3 version hg19")
           }
-
-
-
+          
+          
+          
           
           
           
@@ -854,7 +869,8 @@ snpeff <-
         }
       }
       
-    } else if (referencia_version == "hg38") {
+    }
+    else if (referencia_version == "hg38") {
       output_folder <-
         file.path(input_directory, paste0("anotacion", referencia_version))
       
@@ -863,28 +879,31 @@ snpeff <-
       file_output2.hg38 <-
         file.path(output_folder, "annotated_hg38_pred.vcf")
       file_output3.hg38 <-
-        file.path(output_folder, "annotated__hg38_clin.vcf")
+        file.path(output_folder, "annotated_hg38_clin.vcf")
       
       
       campos_data_hg38 <-
-        list.files(file.path(dir_snpeff, "data", "dbNSFP", "hg38"), pattern = "gz$",full.names = T)
+        list.files(
+          file.path("~/tools/exomas_tools/snpEff/data", "dbNSFP", "hg38"),
+          pattern = "gz$",
+          full.names = T
+        )
       
       
       clinvar_hg38 <-
-        list.files(file.path(dir_snpeff, "data", "clinvar", "GRCh37"), "gz$",full.names = T)
+        list.files(file.path( "~/tools/exomas_tools/snpEff/data", "clinvar", "GRCh38"),
+                   "gz$",
+                   full.names = T)
       
       if (!dir.exists(output_folder)) {
         dir.create(output_folder)
         if (!file.exists(file_output1.hg38) |
             !file.exists(file_output2.hg38) |
             !file.exists(file_output3.hg38)) {
-          
-          
-          if(!file.exists(file_output1.hg38)){
-            
+          if (!file.exists(file_output1.hg38)) {
             comando1_hg38 <-
               paste(
-                "java -Xmx4g -jar ",
+                "java -Xmx6g -jar ",
                 snpeff_program,
                 referencia_version,
                 "-v",
@@ -895,158 +914,186 @@ snpeff <-
             print(comando1_hg38)
             system(comando1_hg38)
             
-          }else{
+          } else{
             message("Ya se ha anotado el exoma 1 version hg38")
           }
-          if(!file.exists(file_output2.hg38)){
-            
-            
+          if (!file.exists(file_output2.hg38)) {
             comando2_hg38 <-
               paste(
-                "java -Xmx4g -jar ",
+                "java -Xmx6g -jar ",
                 snpsift_program,
                 "DbNsfp -db",
                 campos_data_hg38,
-                "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score -v",
+                "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score ",
                 file_output1.hg38,
-                ">",
+                "-v >",
                 file_output2.hg38
               )
             print(comando2_hg38)
             system(comando2_hg38)
-          }else{
+          } else{
             message("Ya se ha anotado el exoma 2 version hg38")
           }
-          if(!file.exists(file_output3.hg38)){
-            
-            
+          if (!file.exists(file_output3.hg38)) {
             comando3_clinvar.hg38 <-
-              paste("java -Xmx4g -jar",
-                    snpsift_program,
-                    "annotate",
-                    clinvar_hg38,
-                    file_output2.hg38,
-                    "-v >",file_output3.hg38)
+              paste(
+                "java -Xmx6g -jar",
+                snpsift_program,
+                "annotate",
+                clinvar_hg38,
+                file_output2.hg38,
+                "-v >",
+                file_output3.hg38
+              )
             
             print(comando3_clinvar.hg38)
             system(comando3_clinvar.hg38)
             
-          }else{
+          } else{
             message("Ya se ha anotado todo el exoma 3 version hg38")
           }
-
-      
-        } else if (dir.exists(output_folder)) {
-          if (!file.exists(file_output1.hg19) |
-              !file.exists(file_output2.hg19) |
-              !file.exists(file_output3.hg19)) {
-            
-            if(!file.exists(file_output1.hg38)){
-              
-              comando1_hg38 <-
-                paste(
-                  "java -Xmx4g -jar ",
-                  snpeff_program,
-                  referencia_version,
-                  "-v",
-                  file_input,
-                  ">",
-                  file_output1.hg38
-                )
-              print(comando1_hg38)
-              system(comando1_hg38)
-            }else{
-              message("Ya se ha anotado y el dorectorio esta creado 1 version hg38")
-            }
-            
-            if(!file.exists(file_output2.hg38)){
-              
-              comando2_hg38 <-
-                paste(
-                  "java -Xmx4g -jar ",
-                  snpsift_program,
-                  "DbNsfp -db",
-                  campos_data_hg38,
-                  "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score -v",
-                  file_output1.hg38,
-                  ">",
-                  file_output2.hg38
-                )
-              print(comando2_hg38)
-              system(comando2_hg38)
-            }else{
-              message("Ya se ha anotado y el directorio esta creado 2 version hg38")
-            }
-            if(!file.exists(file_output3.hg38)){
-              
-              
-              comando3_clinvar.hg38 <-
-                paste("java -Xmx4g -jar",
-                      snpsift_program,
-                      "annotate",
-                      clinvar_hg38,
-                      file_output2.hg38,
-                      ">",
-                      file_output3.hg38)
-              
-              print(comando3_clinvar.hg38)
-              system(comando3_clinvar.hg38)
-              
-              
-              
-            }else{
-              
-              message("Ya se ha anotado todo el exoma  3 el directorio creado version hg38")
-            }
-
-            
-
-
-            
-          } else{
-            message("Ya sea ha anotado el exoma
-")
-          }
+          
+          
+        } else{
+          message("Ya se ha anotado todo el exoma version hg38")
+          
         }
-        
+      } else if (dir.exists(output_folder)) {
+        if (!file.exists(file_output1.hg38) |
+            !file.exists(file_output2.hg38) |
+            !file.exists(file_output3.hg38)) {
+          if (!file.exists(file_output1.hg38)) {
+            comando1_hg38 <-
+              paste(
+                "java -Xmx6g -jar ",
+                snpeff_program,
+                referencia_version,
+                "-v",
+                file_input,
+                ">",
+                file_output1.hg38
+              )
+            print(comando1_hg38)
+            system(comando1_hg38)
+          } else{
+            message("Ya se ha anotado y el dorectorio esta creado 1 version hg38")
+          }
+          
+          if (!file.exists(file_output2.hg38)) {
+            comando2_hg38 <-
+              paste(
+                "java -Xmx6g -jar ",
+                snpsift_program,
+                "DbNsfp -db",
+                campos_data_hg38,
+                "-f Uniprot_acc,Interpro_domain,1000Gp3_AC,1000Gp3_AFR_AC,1000Gp3_AFR_AF,1000Gp3_EUR_AC,1000Gp3_EUR_AF,1000Gp3_AMR_AC,1000Gp3_AMR_AF,1000Gp3_EAS_AC,1000Gp3_EAS_AF,1000Gp3_SAS_AC,1000Gp3_SAS_AF,ESP6500_AA_AC,ESP6500_AA_AF,ESP6500_EA_AC,ESP6500_EA_AF,ExAC_AC,ExAC_AF,ExAC_Adj_AC,ExAC_Adj_AF,ExAC_AFR_AC,ExAC_AFR_AF,ExAC_AMR_AC,ExAC_AMR_AF,ExAC_EAS_AC,ExAC_EAS_AF,ExAC_FIN_AC,ExAC_FIN_AF,ExAC_NFE_AC,ExAC_NFE_AF,ExAC_SAS_AC,ExAC_SAS_AF,SIFT_pred,SIFT_score,Polyphen2_HDIV_pred,Polyphen2_HDIV_score,Polyphen2_HVAR_pred,Polyphen2_HVAR_score,MutationTaster_pred,MutationTaster_score,phastCons100way_vertebrate,phastCons100way_vertebrate,phyloP100way_vertebrate_rankscore,phyloP30way_mammalian_rankscore,phyloP17way_primate_rankscore,integrated_fitCons_score ",
+                file_output1.hg38,
+                "-v > ",
+                file_output2.hg38
+              )
+            print(comando2_hg38)
+            system(comando2_hg38)
+          } else{
+            message("Ya se ha anotado y el directorio esta creado 2 version hg38")
+          }
+          if (!file.exists(file_output3.hg38)) {
+            comando3_clinvar.hg38 <-
+              paste(
+                "java -Xmx6g -jar",
+                snpsift_program,
+                "annotate",
+                clinvar_hg38,
+                file_output2.hg38,
+                "-v >",
+                file_output3.hg38
+              )
+            
+            print(comando3_clinvar.hg38)
+            system(comando3_clinvar.hg38)
+    
+          } else{
+            message("Ya se ha anotado todo el exoma  3 el directorio creado version hg38")
+          }
+          
+          
+          
+          
+          
+        }
+      } else{
+        message("Ya sea ha anotado el exoma")
       }
-    } else{
+      
+    }
+    else{
       errorCondition("NO se tomo bien la referencia")
     }
-    
-    
-    
-    
-    
-    
-    
-    
   }
 
 
 
+post_prpcess_snpeff <- function(output_dir=output_directory){
+  
+  output_dir <- "/repositorio/exomas/pipeline/muestra136800/output_dir_38"
+  
+  referencia_version <- unlist(strsplit(basename(output_dir),"_"))[3]
+  
+  dir_input <- file.path(output_dir, paste0("anotacionhg", referencia_version))
+  
+  file_input <- paste("annotated",referencia_version,"clin.vcf",sep = "_")
+  
+  input_file <- file.path(dir_input,file_input)
+  
+  output_file <- paste0(file_path_sans_ext(input_file),".tsv")
+  
+  comando <- paste("vk vcf2tsv long --print-header --ANN ",input_file, ">",output_file)
+  
+  system(comando)
+  
+  
+}
 
-pipeline <- "../pipeline"
-muestra <- "muestraToy"
-folder_fq <- "fastq_files"
-referencia <- "19" #19 o 38
-cromosoma_genoma <- "cromosoma8"
-folder_fasta <-
-  file.path("../datos", paste0("genomaHg", referencia), cromosoma_genoma)
-dir_snpeff_ <- "~/tools/exomas_tools/snpEff/"
-files_folder <- file.path(pipeline, muestra, folder_fq)
-output_directory <- file.path(pipeline, muestra, paste0("output_dir_",referencia))
 
-fastqc_R(name_output_dir=paste0("output_dir_",referencia))
-#
-bwa_mem2(referencia=referencia)
-#
-filter1()
-#
-RmDup()
-#
-freebayes()
-#
-bcfnorm()
 
-snpeff()
+
+
+muestras <- c("muestra181772")
+# 
+
+for(muestra_i in muestras){
+  cromosoma_genoma <- "genoma"
+  pipeline <- "/repositorio/exomas/pipeline"
+  muestra <- muestra_i
+  folder_fq <- "fastqfiles"
+
+  referencia <- "19" #19 o 38
+  folder_fasta <-
+    file.path("/repositorio/exomas/datos", paste0("genomaHg", referencia), cromosoma_genoma)
+  dir_snpeff_ <- "~/tools/exomas_tools/snpEff"
+  files_folder <- file.path(pipeline, muestra, folder_fq)
+  (output_directory <-
+    file.path(pipeline, muestra, paste0("output_dir_", referencia)))
+  name_output_dir <-  paste0("output_dir_", referencia)
+  fastqc_R(name_output_dir =name_output_dir,input_directory = files_folder)
+  #
+  bwa_mem2(referencia = referencia)
+#   #
+  filter1(input_directory = output_directory )
+#   #
+  RmDup(input_directory = output_directory)
+#   #
+  freebayes(input_directory = output_directory,reference_genome =folder_fasta)
+#   #
+  bcfnorm(input_directory = output_directory,reference_genome = folder_fasta)
+# #
+  snpeff(input_directory = output_directory,dir_snpeff = dir_snpeff_)
+#
+  # post_prpcess_snpeff(output_dir = output_directory)
+
+}
+#
+# 
+# 
+# 
+# # 
+# #
