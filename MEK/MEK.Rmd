@@ -1,0 +1,221 @@
+---
+title: "FIltrado_Clinico_AE2"
+author: "Edmond Geraud y"
+date: '2022-09-14'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(dplyr)
+library(limma)
+
+```
+
+```{r}
+
+mek <- "/repositorio/exomas/pipeline/muestra002/output_dir_38/anotacionhg38/annotated_hg38_clin.tsv"
+
+fields <- read.csv("./vcf_fields_important.csv",header=F)
+
+
+mek <- read.delim(mek,na.strings = ".")[,fields[,1]]
+
+```
+```{r}
+phred <- function(x){10^(-x/10)} # qual to prob
+invprhed <- function(x){-10*log10(x)} # prob to qual
+geno_feno <- read.delim("./genes_to_phenotype.txt",skip=1,header=F)
+
+```
+
+```{r}
+hpo <- read.delim("./phenotype_to_genes.txt",skip=1,header=F)
+```
+
+
+```{r}
+filtrado <- function(vcf,and,or){
+  vcf <- vcf[!duplicated(vcf$POS),]
+  vcf.o <- vcf[!duplicated(vcf$POS),]
+  vcf$QUALprob <- 10^(-vcf$QUAL/10)
+  vcf$QUALtrun <- ifelse(vcf$QUAL>=99,99,vcf$QUAL)
+  freqs <-as.numeric(as.matrix(vcf[,colnames(vcf)[76:91]]))
+  freqs[is.na(freqs)]<-0
+  vcf[,colnames(vcf)[76:91]]<-freqs
+  vcf <- vcf[vcf$transcript_biotype=="protein_coding",]
+  vcf <- vcf[vcf$F_GT!="0/0",]
+  vcf <- vcf[which(!grepl("inter",vcf$effect,ignore.case = T)),]
+  vcf <- vcf[which(!grepl("intron",vcf$effect,ignore.case = T)),]
+  thres.DP <- fivenum(vcf$DP)[2]
+  thres.QUAL <- fivenum(vcf$QUAL)[2]
+  thres.ODDS <- fivenum(vcf$ODDS)[2]
+  thres.GQ <- fivenum(vcf$F_GQ)[2]
+  thres.paired <-0.8
+
+  
+  vcf$QUALA <-invprhed(phred(vcf$F_QA))
+  vcf$QUALR <-invprhed(phred(vcf$F_QA))
+  vcf$QUALL <- invprhed(phred(vcf$QUAL))
+  prosbs <- vector("numeric",length=nrow(vcf))
+for(i in 1:nrow(vcf)){
+  prosbs[i] <- binom.test(vcf$AO[i],vcf$DP[i],alternative = "less")$p.value
+}
+vcf$probs <- p.adjust(prosbs,method = "bonferroni")
+    vcf <- vcf[vcf$DP>=thres.DP & vcf$QUAL>=thres.QUAL & vcf$ODDS>=thres.ODDS & vcf$F_GQ>=thres.GQ & vcf$PAIRED>=thres.paired,]
+
+SIFT <-strsplit2(vcf$dbNSFP_SIFT_score,",")
+SIFT <- apply(SIFT, 2, as.numeric)
+SIFT <- rowMeans(SIFT,na.rm = T)
+
+polyphen <-strsplit2(vcf$dbNSFP_Polyphen2_HDIV_score,",")
+polyphen <- apply(polyphen, 2, as.numeric)
+polyphen <- rowMeans(polyphen,na.rm = T)
+
+mutation <-strsplit2(vcf$dbNSFP_MutationTaster_score,",")
+mutation <- apply(mutation, 2, as.numeric)
+mutation <- rowMeans(mutation,na.rm = T)
+vcf$SIFT <- SIFT
+vcf$POLYPHEN <- polyphen
+vcf$MUTATION <- mutation
+vcf$POLYPRED<- NA
+vcf$SIFTPRED<- NA
+vcf$MUTPRED <- NA
+vcf$POLYPRED <- ifelse(vcf$POLYPHEN>=0.85,"D",NA)
+vcf$POLYPRED <- ifelse(vcf$POLYPHEN<0.85 & vcf$POLYPHEN>0.15,"PD",vcf$POLYPRED)
+vcf$POLYPRED <- ifelse(vcf$POLYPHEN<0.15,"B",vcf$POLYPRED)
+
+vcf$SIFTPRED <- ifelse(vcf$SIFT>=0.85,"B",NA)
+vcf$SIFTPRED <- ifelse(vcf$SIFT<0.85 & vcf$SIFT>0.15,"PD",vcf$SIFTPRED)
+vcf$SIFTPRED <- ifelse(vcf$SIFT<=0.15,"D",vcf$SIFTPRED)
+
+vcf$MUTPRED <- ifelse(vcf$MUTATION>0.5,"D","ND")
+
+# csa <- vcf[vcf$gene_name %in% goi.fibrosis,]
+
+
+if (and==TRUE){
+  vcf <- vcf[vcf$MUTPRED=="D" & vcf$POLYPRED=="D" & vcf$SIFTPRED=="D",]
+  vcf <-vcf[rowSums(is.na(vcf)) != ncol(vcf), ]
+
+
+}else if( or ==TRUE){
+    vcf <- vcf[vcf$MUTPRED=="D" | vcf$POLYPRED=="D" | vcf$SIFTPRED=="D",]
+    vcf <-vcf[rowSums(is.na(vcf)) != ncol(vcf), ]
+
+
+} else{
+  vcf <-vcf[rowSums(is.na(vcf)) != ncol(vcf), ]
+
+  
+  
+}
+return(list(filt = vcf,complete=vcf.o))
+
+}
+
+filtrado.conservador <- function(tofilt,goi){
+  
+  vcf <- tofilt[which(tofilt$SIFTPRED=="D" | tofilt$MUTPRED=="D" |
+tofilt$POLYPRED=="D"|is.na(tofilt$SIFTPRED )| is.na(tofilt$MUTPRED )|
+is.na(tofilt$POLYPRED)),]
+  # vcf <- vcf[which(!is.na(vcf$CLNDN)),]
+  # vcf.goi <- vcf[vcf$gene_name %in% goi,]
+  # vcf.list <- list(vcf=vcf,vcf.goi=vcf.goi)
+  return(vcf)
+}
+
+
+
+filt.pre <-filtrado(mek,T,F)$filt
+```
+
+
+```{r}
+filt.pre <-filtrado(mek,T,F)$filt
+
+```
+
+```{r}
+geno_feno<-geno_feno[,c(2,4)]
+colnames(geno_feno) <- c("gene_name","fenotipo")
+grupos <- inner_join(geno_feno,hemihyperplasia,by="gene_name")
+
+terms <- c("hemihypertrophy","^hypertrophy of the [lu]","Lower limb undergrowth","Upper limb undergrowth","Limb undergrowth","^Overgrowth$","Asymmetric growth","Growth abnormality")
+list.aux <- vector("list",length=length(terms))
+for( i in 1:length(terms)){
+ list.aux[[i]] <-  grupos[grep(terms[i],ignore.case =T,x=grupos$fenotipo),]
+ 
+ 
+}
+list.aux[sapply(list.aux, is.null)] <- NULL
+list.aux <- Reduce("rbind",list.aux)
+final <- unique(bind_rows(list.aux))
+```
+
+```{r}
+
+
+```
+
+```{r}
+# final <- final[final$fenotipo=="Hemihypertrophy",]
+```
+
+```{r}
+# write.csv(final,"hemihypertrofia_con_fenotipo.csv")
+```
+
+```{r}
+final <- final[final$DP>20&final$QUAL>50,]
+```
+```{r}
+final <- final[!duplicated(final$POS),]
+```
+
+```{r}
+final <- final[final$effect!="synonymous_variant",]
+final <- final[final$effect!="non_coding_transcript_exon_variant",]
+final <- final[final$effect!="intron_variant",]
+
+views <- final[,c("gene_name","fenotipo","CLNSIG","CLNDN","GENEINFO","RS","SIFTPRED","POLYPRED","MUTPRED")]
+```
+
+
+
+```{r}
+recesivo <-geno_feno[grep("recessive",geno_feno$fenotipo,ignore.case = T),]
+
+dominante <- geno_feno[grep("dominant",ignore.case = T,geno_feno$fenotipo),]
+```
+
+
+```{r}
+recesivo[grep("CFTR",recesivo$gene_name),]
+dominante[grep("CFTR",dominante$gene_name),]
+
+recesivo[grep("MEFV",recesivo$gene_name),]
+dominante[grep("MEFV",dominante$gene_name),]
+```
+
+
+
+```{r}
+mek.dup <- mek[!duplicated(mek$POS),]
+```
+
+
+```{r}
+par(mfrow=c(1,2))
+hist(log(mek.dup$DP),main="Profundidad de Cobertura")
+hist(log(mek.dup$QUAL),main="Calidad de Alineamiento (Phred)")
+```
+
+
+
+
+
