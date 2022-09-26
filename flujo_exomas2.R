@@ -22,14 +22,15 @@
 
 
 library(tools)
+library(Rbwa)
 
 
 
 fastqc_R <-
   function(input_directory = files_folder, name_output_dir) {
-
     
-   
+    
+    
     exit_status1 <- 1
     exit_status0 <- 0
     
@@ -37,12 +38,12 @@ fastqc_R <-
     
     pattern_files <- unique(file_ext(files_fastq))
     input_directory <- files_folder
-
+    
     (output_dir <-
-      file.path(paste(unlist(strsplit(
-        file.path(input_directory), "/"
-      ))[1:5], collapse = "/")
-      , name_output_dir))
+        file.path(paste(unlist(strsplit(
+          file.path(input_directory), "/"
+        ))[1:5], collapse = "/")
+        , name_output_dir))
     output_dir_fqc <- file.path(output_dir, "output_QC")
     command <-
       paste("fastqc -t 4 ",
@@ -110,240 +111,132 @@ index_fasta_samtools <- function(input_directory = folder_fasta) {
   
 }
 
-index_fasta_bwa <- function(input_directory = folder_fasta) {
-  extension = "fasta$"
-  extension = unlist(lapply(list.files(input_directory, pattern = "fa"), function(x)
+
+bwamem <- function(fastq_folder = files_folder ,
+                   reference_genome = folder_fasta,
+                   referencia) {
+  ## Comprobamos que existe archivo fasta
+  
+  extension = unlist(lapply(list.files(reference_genome, pattern = "fa"), function(x)
     file_ext(x)))
-  if (extension[1] == "fasta" || extension[1] == "fa") {
+  if (extension[1] == "fasta$" || extension[1] == "fa$") {
     extension <- extension
   } else{
     errorCondition("No existe archivo fasta")
   }
   fasta_file <-
-    list.files(input_directory,
-               pattern = paste0(".", extension),
+    list.files(reference_genome,
+               pattern = paste0(".", extension,"$"),
                full.names = T)
+  print(fasta_file)
+  ##### fai index exist ?######
   
-  
-  fasta_file <- fasta_file[1]
-  
-  command <- paste("bwa index", fasta_file)
-  
-  print(command)
-  
-  system(command)
-  
-}
-
-
-
-bwa_mem2 <-
-  function(fastq_folder = files_folder ,
-           reference_genome = folder_fasta,
-           referencia) {
-    ## Comprobamos que existe archivo fasta
+  if (!length(file.exists(file.path(
+    reference_genome, list.files(reference_genome, "fai")
+  )))) {
+    print("### generating fai index...")
     
-    extension = "fasta$"
-    extension = unlist(lapply(list.files(reference_genome, pattern = "fa"), function(x)
-      file_ext(x)))
-    if (extension[1] == "fasta" || extension[1] == "fa") {
-      extension <- extension
-    } else{
-      errorCondition("No existe archivo fasta")
-    }
-    fasta_file <-
-      list.files(reference_genome,
-                 pattern = paste0(".", extension),
-                 full.names = T)
-    
-    ##### fai index exist ?######
-    
-    if (!length(file.exists(file.path(
-      reference_genome, list.files(reference_genome, "fai")
-    )))) {
-      print("### generating fai index...")
-      
-      index_fasta_samtools(input_directory = reference_genome)
-      
-    }
-    
-    ## Comprobamos que esiste bwa index files
-    extension <- c("amb", "ann", "bwt", "pac", "sa")
-    
-    if (!length(file.exists(list.files(reference_genome, extension[1]))) |
-        !length(file.exists(list.files(reference_genome, extension[2]))) |
-        !length(file.exists(list.files(reference_genome, extension[3]))) |
-        !length(file.exists(list.files(reference_genome, extension[4]))) |
-        !length(file.exists(list.files(reference_genome, extension[4])))) {
-      ## no existen bwa index
-      print("Creando ficheros índices para bwa mem...")
-      index_fasta_bwa(input_directory = reference_genome)
-      
-    }
-    
-    
-    
-    ## Buscamos refenrecia fasta
-    extensiones <- unlist(lapply(fasta_file, function(x)
-      file_ext(x)))
-    tmp.ext <- grep("fa$", extensiones)
-    tmp.ext2 <- grep("fasta$", extensiones)
-    extensiones_which <- c(tmp.ext, tmp.ext2)
-    extension <- extensiones[extensiones_which]
-    fasta_file <-
-      list.files(reference_genome,
-                 full.names = T,
-                 pattern = paste0(extension, "$"))
-    fastq_files <- list.files(fastq_folder, full.names = T)
-    ## Archivos fastq
-    fastq_full_path_files <-
-      list(fastq_1 = fastq_files[1], fastq_2 = fastq_files[2])
-    ## Creamos directorio de mapeo
-    output_file_name <-
-      unlist(strsplit(gsub("R[12]", "map", fastq_files[1]), "/"))[5]
-    
-    output_dir <-
-      file.path(paste(unlist(strsplit(
-        file.path(fastq_folder), "/"
-      ))[1:5], collapse = "/")
-      , "output_dir")
-    output_folder <-
-      file.path(paste(output_dir, referencia, sep = "_"), "mapping_output")
-    output_file_sam <-
-      file.path(output_folder, paste0(output_file_name, ".sam"))
-    output_file_bam <-
-      file.path(output_folder, paste0(output_file_name, ".bam"))
-    output_file_sorted_bam <-
-      file.path(output_folder, paste0(output_file_name, ".sorted.bam"))
-    if (!dir.exists(output_folder)) {
-      dir.create(output_folder)
-      if (length(list.files(output_folder)) == 0)
-        
-        
-        print("#### MAPPING...#####")
-      
-      comando_mapper <-
-        paste(
-          "./bwa-mapper.sh ",
-          fastq_full_path_files$fastq_1,
-          fastq_full_path_files$fastq_2,
-          fasta_file,
-          output_file_sam
-        )
-      print(comando_mapper)
-      system(comando_mapper)
-      
-      print("#### SAM TO BAM")
-      
-      command_sam_to_bam <-
-        paste("samtools view -S -b",
-              output_file_sam,
-              "-o",
-              output_file_bam)
-      
-      print(command_sam_to_bam)
-      system(command_sam_to_bam)
-      
-      print("### BAM to sorted BAM")
-      command_out_bam_sorted <-
-        paste("samtools sort ",
-              output_file_bam ,
-              "-o",
-              output_file_sorted_bam)
-      
-      print(command_out_bam_sorted)
-      system(command_out_bam_sorted)
-      
-      
-    } else if (dir.exists(output_folder) &&
-               !dir.exists(output_folder)) {
-      dir.create(output_folder)
-      
-      
-      
-      
-      print("#### MAPPING...#####")
-      
-      comando_mapper <-
-        paste(
-          "./bwa-mapper.sh ",
-          fastq_full_path_files$fastq_1,
-          fastq_full_path_files$fastq_2,
-          fasta_file,
-          output_file_sam
-        )
-      print(comando_mapper)
-      system(comando_mapper)
-      
-      print("#### SAM TO BAM")
-      
-      command_sam_to_bam <-
-        paste("samtools view -S -b",
-              output_file_sam,
-              "-o",
-              output_file_bam)
-      
-      print(command_sam_to_bam)
-      system(command_sam_to_bam)
-      
-      print("### BAM to sorted BAM")
-      command_out_bam_sorted <-
-        paste("samtools sort ",
-              output_file_bam ,
-              "-o",
-              output_file_sorted_bam)
-      
-      print(command_out_bam_sorted)
-      system(command_out_bam_sorted)
-      
-      
-    } else if (dir.exists(output_folder) &&
-               dir.exists(output_folder)) {
-      if (length(list.files(output_folder)) == 0) {
-        print("#### MAPPING...#####")
-        
-        comando_mapper <-
-          paste(
-            "./bwa-mapper.sh ",
-            fastq_full_path_files$fastq_1,
-            fastq_full_path_files$fastq_2,
-            fasta_file,
-            output_file_sam
-          )
-        print(comando_mapper)
-        system(comando_mapper)
-        
-        print("#### SAM TO BAM")
-        
-        command_sam_to_bam <-
-          paste("samtools view -S -b",
-                output_file_sam,
-                "-o",
-                output_file_bam)
-        
-        print(command_sam_to_bam)
-        system(command_sam_to_bam)
-        
-        print("### BAM to sorted BAM")
-        command_out_bam_sorted <-
-          paste("samtools sort ",
-                output_file_bam ,
-                "-o",
-                output_file_sorted_bam)
-        
-        print(command_out_bam_sorted)
-        system(command_out_bam_sorted)
-        
-        
-      } else{
-        message("Ya se ha mapeado")
-      }
-      
-      
-    }
+    index_fasta_samtools(input_directory = reference_genome)
     
   }
+  
+  ## Comprobamos que esiste bwa index files
+  extension <- c("amb", "ann", "bwt", "pac", "sa")
+  
+  if (!length(file.exists(list.files(reference_genome, extension[1],full.names = T))) |
+      !length(file.exists(list.files(reference_genome, extension[2],full.names = T))) |
+      !length(file.exists(list.files(reference_genome, extension[3],full.names = T))) |
+      !length(file.exists(list.files(reference_genome, extension[4],full.names = T))) |
+      !length(file.exists(list.files(reference_genome, extension[5],full.names = T)))) {
+    ## no existen bwa index
+    print("Creando ficheros índices para bwa mem...")
+    
+    bwa_build_index(fasta_file,index_prefix = file.path(folder_fasta,paste0("genomaHg",referencia)))
+    
+  }
+  
 
+  
+  ## Buscamos refenrecia fasta
+  extensiones <- unlist(lapply(fasta_file, function(x)
+    file_ext(x)))
+  tmp.ext <- grep("fa$", extensiones)
+  tmp.ext2 <- grep("fasta$", extensiones)
+  extensiones_which <- c(tmp.ext, tmp.ext2)
+  extension <- extensiones[extensiones_which]
+  fasta_file <-
+    list.files(reference_genome,
+               full.names = T,
+               pattern = paste0(extension, "$"))
+  fastq_files <- list.files(fastq_folder, full.names = T)
+  ## Archivos fastq
+  fastq_full_path_files <-
+    c(fastq_1 = fastq_files[1], fastq_2 = fastq_files[2])
+  ## Creamos directorio de mapeo
+  output_file_name <-
+    unlist(strsplit(gsub("R[12]", "map", fastq_files[1]), "/"))[5]
+  
+  output_dir <-
+    file.path(paste(unlist(strsplit(
+      file.path(fastq_folder), "/"
+    ))[1:5], collapse = "/")
+    , "output_dir")
+  output_folder <-
+    file.path(paste(output_dir, referencia, sep = "_"), "mapping_output")
+  output_file_sam <-
+    file.path(output_folder, paste0(output_file_name, ".sam"))
+  output_file_bam <-
+    file.path(output_folder, paste0(output_file_name, ".bam"))
+  output_file_sorted_bam <-
+    file.path(output_folder, paste0(output_file_name, ".sorted.bam"))
+  if(!dir.exists(output_folder)){
+    dir.create(output_folder)
+  }
+  if (length(list.files(output_folder)) == 0){
+    
+    print("#### MAPPING...#####")
+    bwa_mem(index_prefix=file.path(reference_genome,paste0("genomaHg38")),
+            fastq_files=fastq_full_path_files,
+            sam_file=file.path(output_folder, paste0(output_file_name,".sam")),type="paired")
+  }
+  if(file.exists(output_file_sam)& !file.exists(output_file_sorted_bam)){
+  
+    
+    print("#### SAM TO BAM")
+    
+    command_sam_to_bam <-
+      paste("samtools view -S -b",
+            output_file_sam,
+            "-o",
+            output_file_bam)
+    
+    print(command_sam_to_bam)
+    system(command_sam_to_bam)
+    
+    print("### BAM to sorted BAM")
+    command_out_bam_sorted <-
+      paste("samtools sort ",
+            output_file_bam ,
+            "-o",
+            output_file_sorted_bam)
+    
+    print(command_out_bam_sorted)
+    system(command_out_bam_sorted)
+    
+    
+  }else if(file.exists(output_file_sam) &&
+           file.exists(output_file_bam) &&
+           file.exists(output_file_sorted_bam)){
+    message("Ya se ha mapeado")
+  }else{
+    stop(message("No se ha mapeado bien",call=T))
+  }
+  
+
+    
+}
+  
+  
 
 filter1 <- function(input_directory = output_directory) {
   input_directory <- output_directory
@@ -696,7 +589,7 @@ snpeff <-
       list.files(dir_snpeff, "snpEff.jar", full.names = T)
     snpsift_program <-
       list.files(dir_snpeff, "SnpSift.jar", full.names = T)
-
+    
     
     if (referencia_version == "hg19") {
       output_folder <-
@@ -1010,7 +903,7 @@ snpeff <-
             
             print(comando3_clinvar.hg38)
             system(comando3_clinvar.hg38)
-    
+            
           } else{
             message("Ya se ha anotado todo el exoma  3 el directorio creado version hg38")
           }
@@ -1030,70 +923,36 @@ snpeff <-
     }
   }
 
+muestras <- c("muestra002")
+for( muestra_i in muestras){
+cromosoma_genoma <- "genoma/canonical"
+pipeline <- "/repositorio/exomas/pipeline"
+muestra <- muestra_i
+folder_fq <- "fastqfiles"
 
-
-post_prpcess_snpeff <- function(output_dir=output_directory){
-  
-  output_dir <- "/repositorio/exomas/pipeline/muestra136800/output_dir_38"
-  
-  referencia_version <- unlist(strsplit(basename(output_dir),"_"))[3]
-  
-  dir_input <- file.path(output_dir, paste0("anotacionhg", referencia_version))
-  
-  file_input <- paste("annotated",referencia_version,"clin.vcf",sep = "_")
-  
-  input_file <- file.path(dir_input,file_input)
-  
-  output_file <- paste0(file_path_sans_ext(input_file),".tsv")
-  
-  comando <- paste("vk vcf2tsv long --print-header --ANN ",input_file, ">",output_file)
-  
-  system(comando)
-  
-  
-}
-
-
-
-
-
-muestras <- c("muestra001")
-#
-
-for(muestra_i in muestras){
-  cromosoma_genoma <- "genoma/canonical"
-  pipeline <- "/repositorio/exomas/pipeline"
-  muestra <- muestra_i
-  folder_fq <- "fastqfiles"
-
-  referencia <- "38" #19 o 38
-  folder_fasta <-
-    file.path("/repositorio/exomas/datos", paste0("genomaHg", referencia), cromosoma_genoma)
-  dir_snpeff_ <- "~/tools/exomas_tools/snpEff"
-  files_folder <- file.path(pipeline, muestra, folder_fq)
-  (output_directory <-
+referencia <- "38" #19 o 38
+folder_fasta <-
+  file.path("/repositorio/exomas/datos", paste0("genomaHg", referencia), cromosoma_genoma)
+dir_snpeff_ <- "~/tools/exomas_tools/snpEff"
+files_folder <- file.path(pipeline, muestra, folder_fq)
+(output_directory <-
     file.path(pipeline, muestra, paste0("output_dir_", referencia)))
-  name_output_dir <-  paste0("output_dir_", referencia)
-  fastqc_R(name_output_dir =name_output_dir,input_directory = files_folder)
+name_output_dir <-  paste0("output_dir_", referencia)
+fastqc_R(name_output_dir =name_output_dir,input_directory = files_folder)
+bwamem(referencia=referencia)
   #
-  bwa_mem2(referencia = referencia)
-#   #
-#   filter1(input_directory = output_directory )
-# #   #
-#   RmDup(input_directory = output_directory)
-# #   #
-#   freebayes(input_directory = output_directory,reference_genome =folder_fasta)
-# #   #
-#   bcfnorm(input_directory = output_directory,reference_genome = folder_fasta)
-# # #
-#   snpeff(input_directory = output_directory,dir_snpeff = dir_snpeff_)
-#
+  #   #
+    filter1(input_directory = output_directory )
+  # #   #
+    RmDup(input_directory = output_directory)
+  # #   #
+    freebayes(input_directory = output_directory,reference_genome =folder_fasta)
+  # #   #
+    bcfnorm(input_directory = output_directory,reference_genome = folder_fasta)
+  # # #
+    snpeff(input_directory = output_directory,dir_snpeff = dir_snpeff_)
+  #
   # post_prpcess_snpeff(output_dir = output_directory)
-
+  
 }
 #
-# 
-# 
-# 
-# # 
-# #
